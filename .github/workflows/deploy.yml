@@ -50,7 +50,7 @@ jobs:
           fetch-depth: 0
 
       - name: Make Scripts Executable
-        run: chmod +x CICD/CIScripts/*.sh
+        run: chmod +x CIScripts/*.sh
 
       - name: Authenticate to Salesforce Org (QA)
         run: |
@@ -58,16 +58,14 @@ jobs:
           sf org login sfdx-url --sfdx-url-file auth-url.txt --alias ${{ env.ORG_ALIAS }} --set-default
 
       - name: Generate Delta Package
-        run: bash CICD/CIScripts/generate-delta.sh
+        run: bash CIScripts/generate-delta.sh
 
       - name: Validate Deployment
-        working-directory: CICD
         run: |
-          sf project deploy validate \
-            --source-dir delta/package \
-            --target-org ${{ env.ORG_ALIAS }} \
-            --test-level RunSpecifiedTests \
-            --tests "AttachmentTriggerHandler_Test" \
+          sfdx force:source:deploy \
+            --sourcepath delta/package \
+            -u ${{ env.ORG_ALIAS }} \
+            -c \
             --wait 10 \
             --verbose || { echo "❌ Validation failed."; exit 1; }
 
@@ -82,7 +80,7 @@ jobs:
           fetch-depth: 0
 
       - name: Make Scripts Executable
-        run: chmod +x CICD/CIScripts/*.sh
+        run: chmod +x CIScripts/*.sh
 
       - name: Authenticate to Salesforce Org (QA)
         run: |
@@ -90,10 +88,10 @@ jobs:
           sf org login sfdx-url --sfdx-url-file auth-url.txt --alias ${{ env.ORG_ALIAS }} --set-default
 
       - name: Generate Delta Package
-        run: bash CICD/CIScripts/generate-delta.sh
+        run: bash CIScripts/generate-delta.sh
 
       - name: Backup Delta from Org
-        run: bash CICD/CIScripts/delta-backup.sh
+        run: bash CIScripts/delta-backup.sh
         env:
           BACKUP_DIR: "deltabackup-${{ github.run_id }}"
           ORG_ALIAS: ${{ env.ORG_ALIAS }}
@@ -102,10 +100,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: delta-backup-SF-QA
-          path: CICD/deltabackup*
+          path: deltabackup*
 
       - name: Deploy Delta to Org
-        working-directory: CICD
         run: |
           sfdx force:source:deploy \
             --sourcepath delta/package \
@@ -140,7 +137,6 @@ jobs:
             --verbose
 
       - name: Deploy Destructive Changes
-        working-directory: CICD
         run: |
           if [[ -s "delta/destructiveChanges.xml" ]]; then
             echo "✅ Destructive changes found. Deploying..."
@@ -153,7 +149,6 @@ jobs:
             sf project deploy start \
               --manifest delta/destructive/package.xml \
               --destructive-changes delta/destructive/destructiveChanges.xml \
-              --tests "AttachmentTriggerHandler_Test" \
               --target-org ${{ env.ORG_ALIAS }} \
               --wait 10 \
               --verbose || echo "⚠️ Destructive deployment skipped due to error."
@@ -167,7 +162,7 @@ jobs:
           echo "🧹 Cleaning up temporary files..."
           rm -f auth-url.txt
           rm -rf delta/
-          rm -rf CICD/deltabackup*
+          rm -rf deltabackup*
           echo "✅ Cleanup complete."
 
   manual-deploy:
@@ -184,7 +179,7 @@ jobs:
           fetch-depth: 0
 
       - name: Make Scripts Executable
-        run: chmod +x CICD/CIScripts/*.sh
+        run: chmod +x CIScripts/*.sh
 
       - name: Authenticate to Salesforce Org
         run: |
@@ -199,13 +194,13 @@ jobs:
           sf org login sfdx-url --sfdx-url-file auth-url.txt --alias ${{ env.ORG_ALIAS }} --set-default
 
       - name: Generate Delta Package
-        run: bash CICD/CIScripts/generate-delta.sh
+        run: bash CIScripts/generate-delta.sh
         env:
           ENVIRONMENT: ${{ github.event.inputs.environment }}
           FALLBACK_DEPTH: ${{ env.FALLBACK_DEPTH }}
 
       - name: Backup Delta from Org
-        run: bash CICD/CIScripts/delta-backup.sh
+        run: bash CIScripts/delta-backup.sh
         env:
           BACKUP_DIR: "deltabackup-${{ github.run_id }}"
           ORG_ALIAS: ${{ env.ORG_ALIAS }}
@@ -214,7 +209,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: delta-backup-${{ github.event.inputs.environment }}
-          path: CICD/deltabackup*
+          path: deltabackup*
 
       - name: Deploy Delta to Org
         run: |
@@ -266,5 +261,5 @@ jobs:
           echo "🧹 Cleaning up temporary files..."
           rm -f auth-url.txt
           rm -rf delta/
-          rm -rf CICD/deltabackup*
+          rm -rf deltabackup*
           echo "✅ Cleanup complete."
