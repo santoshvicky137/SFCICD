@@ -40,10 +40,12 @@ BASE_COMMIT=""
 
 if [[ "$ENVIRONMENT" =~ SF-QA|SF-UAT|SF-Release ]]; then
   echo "🔍 Retrieving last deploy SHA from org..."
-  CMDT_QUERY_RESULT=$(sf data query "SELECT Last_Deployed_SHA__c  FROM Deployment_Metadata__mdt" \
-    --target-org "$ORG_ALIAS" --json || true)
+ CMDT_QUERY_RESULT=$(sfdx force:data:soql:query \
+  -q "SELECT Last_Deployed_SHA__c FROM Deployment_Metadata__mdt" \
+  -u "$ORG_ALIAS" --json || true)
 
-  DEPLOYED_SHA=$(echo "$CMDT_QUERY_RESULT" | jq -r '.result.records[0].Last_Deployed_SHA__c')
+ DEPLOYED_SHA=$(echo "$CMDT_QUERY_RESULT" | jq -r '.result.records[0].Last_Deployed_SHA__c')
+
 
   if [[ -n "$DEPLOYED_SHA" && "$DEPLOYED_SHA" != "null" ]]; then
     BASE_COMMIT="$DEPLOYED_SHA"
