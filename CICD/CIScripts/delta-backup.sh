@@ -9,6 +9,11 @@ PACKAGE_XML="$PROJECT_ROOT/delta/package/package.xml"
 BACKUP_DIR="${BACKUP_DIR:-$PROJECT_ROOT/deltabackup-$(date +%Y%m%d-%H%M%S)}"
 ORG_ALIAS="${ORG_ALIAS:-target-org}"
 
+echo "📁 Script path: $SCRIPT_DIR"
+echo "📁 Project root: $PROJECT_ROOT"
+echo "📄 Manifest path: $PACKAGE_XML"
+echo "📂 Backup destination: $BACKUP_DIR"
+
 # === VALIDATION ===
 if [[ ! -f "$PROJECT_ROOT/sfdx-project.json" ]]; then
   echo "❌ Missing sfdx-project.json in '$PROJECT_ROOT'. Not a valid Salesforce DX workspace."
@@ -16,7 +21,7 @@ if [[ ! -f "$PROJECT_ROOT/sfdx-project.json" ]]; then
 fi
 
 if [[ ! -f "$PACKAGE_XML" ]]; then
-  echo "❌ package.xml not found at '$PACKAGE_XML'. Skipping backup."
+  echo "📭 No package.xml found at '$PACKAGE_XML'. Skipping backup."
   exit 0
 fi
 
@@ -38,16 +43,16 @@ if [[ -z "$(find "$BACKUP_DIR" -type f -name '*.xml' 2>/dev/null)" ]]; then
   echo "⚠️ No metadata files retrieved. Likely new components not present in org."
   echo "🧩 Continuing pipeline without backup."
 else
-  echo "✅ Backup completed to '$BACKUP_DIR'."
+  echo "✅ Backup completed at '$BACKUP_DIR'."
 fi
 
-# === GITHUB SUMMARY ===
+# === GITHUB STEP SUMMARY ===
 if [[ -n "$GITHUB_STEP_SUMMARY" ]]; then
   {
     echo "### 📦 Delta Backup Summary"
-    echo "- Org Alias: $ORG_ALIAS"
-    echo "- Backup Directory: $(basename "$BACKUP_DIR")"
-    echo "- Manifest: $(basename "$PACKAGE_XML")"
-    echo "- Timestamp: $(date +'%Y-%m-%d %H:%M:%S')"
+    echo "- **Org Alias**: $ORG_ALIAS"
+    echo "- **Backup Directory**: $(basename "$BACKUP_DIR")"
+    echo "- **Manifest Used**: $(basename "$PACKAGE_XML")"
+    echo "- **Timestamp**: $(date +'%Y-%m-%d %H:%M:%S')"
   } >> "$GITHUB_STEP_SUMMARY"
 fi

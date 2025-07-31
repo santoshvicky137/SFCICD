@@ -6,6 +6,9 @@ set -o pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"  # assumes script is in CICD/CIScripts
 
+# === MOVE TO REPO ROOT ===
+cd "$PROJECT_ROOT"
+
 # === CONFIGURATION ===
 API_VERSION="${API_VERSION:-63.0}"
 DELTA_DIR="$PROJECT_ROOT/delta"
@@ -29,12 +32,9 @@ esac
 echo "🌍 Environment: $ENVIRONMENT"
 [[ -n "$BASE_BRANCH" ]] && echo "🔗 Base Branch: $BASE_BRANCH"
 
-export GIT_DIR="$PROJECT_ROOT/.git"
-export GIT_WORK_TREE="$PROJECT_ROOT"
-
 # === SAFETY CHECK ===
-if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
-  echo "❌ Not inside a Git repository. Aborting."
+if ! git rev-parse --show-toplevel > /dev/null 2>&1; then
+  echo "❌ Git repository not found in $(pwd). Aborting."
   exit 1
 fi
 
@@ -55,12 +55,12 @@ if [[ "$ENVIRONMENT" =~ SF-QA|SF-UAT|SF-Release ]]; then
     echo "✅ Found SHA: $BASE_COMMIT"
   else
     echo "⚠️ No SHA found. Using fallback: last $FALLBACK_DEPTH commits."
-    BASE_COMMIT=$(git -C "$PROJECT_ROOT" log -n $FALLBACK_DEPTH --pretty=format:"%H" | tail -n 1)
+    BASE_COMMIT=$(git log -n $FALLBACK_DEPTH --pretty=format:"%H" | tail -n 1)
     USE_LAST_SHA=true
     echo "🪃 Fallback SHA: $BASE_COMMIT"
   fi
 else
-  BASE_COMMIT=$(git -C "$PROJECT_ROOT" merge-base "$BASE_BRANCH" HEAD)
+  BASE_COMMIT=$(git merge-base "$BASE_BRANCH" HEAD)
   if [[ -z "$BASE_COMMIT" ]]; then
     echo "⚠️ Merge-base not found. Using HEAD~${FALLBACK_DEPTH}"
     BASE_COMMIT="HEAD~${FALLBACK_DEPTH}"
@@ -69,7 +69,7 @@ fi
 
 RANGE="${BASE_COMMIT}..HEAD"
 echo "📊 Diff range: $RANGE"
-git -C "$PROJECT_ROOT" diff --name-status $RANGE -- 'force-app/**' > "$INPUT_FILE"
+git diff --name-status $RANGE -- 'force-app/**' > "$INPUT_FILE"
 
 echo "📋 Changed files:"
 cat "$INPUT_FILE" || echo "None"
@@ -92,11 +92,9 @@ while read -r status file; do
     echo "$file" >> "$DELETIONS_FILE"
     continue
   fi
-  SRC="$PROJECT_ROOT/$file"
-  [[ ! -f "$SRC" ]] && continue
-  DEST="$PACKAGE_DIR/$file"
-  mkdir -p "$(dirname "$DEST")"
-  cp "$SRC" "$DEST"
+  [[ ! -f "$file" ]] && continue
+  mkdir -p "$(dirname "$PACKAGE_DIR/$file")"
+  cp "$file" "$PACKAGE_DIR/$file"
 done < "$INPUT_FILE"
 
 # === STEP 5: Generate package.xml ===
@@ -104,7 +102,7 @@ echo "📦 Generating package.xml..."
 sf project manifest generate \
   --source-dir "$PACKAGE_DIR" \
   --api-version "$API_VERSION"
-mv "$PROJECT_ROOT/package.xml" "$PACKAGE_XML"
+mv package.xml "$PACKAGE_XML"
 
 # === STEP 6: Build destructiveChanges.xml ===
 if [[ "$USE_LAST_SHA" == "true" ]]; then
