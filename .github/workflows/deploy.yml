@@ -44,6 +44,8 @@ jobs:
     runs-on: ubuntu-latest
     container: vlenergy/salesforcevlocity:v4.0
     steps:
+      - name: Mark workspace safe for Git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -75,6 +77,8 @@ jobs:
     runs-on: ubuntu-latest
     container: vlenergy/salesforcevlocity:v4.0
     steps:
+      - name: Mark workspace safe for Git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -177,6 +181,8 @@ jobs:
       ENVIRONMENT: ${{ github.event.inputs.environment }}
       ORG_ALIAS: 'target-org'
     steps:
+      - name: Mark workspace safe for Git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Checkout code
         uses: actions/checkout@v4
         with:
