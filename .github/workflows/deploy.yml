@@ -60,14 +60,15 @@ jobs:
       - name: Generate Delta Package
         run: bash CIScripts/generate-delta.sh
 
-      - name: Validate Deployment
+      - name: ✅ Validate Deployment
         run: |
-          sfdx force:source:deploy \
-            --sourcepath delta/package \
-            -u ${{ env.ORG_ALIAS }} \
-            -c \
-            --wait 10 \
-            --verbose || { echo "❌ Validation failed."; exit 1; }
+          sf project deploy validate \
+           --source-dir delta/package \
+           --target-org target-org \
+           --test-level RunSpecifiedTests \
+           --tests "AttachmentTriggerHandler_Test" \
+           --wait 10 \
+           --verbose || { echo "❌ Validation failed."; exit 1; }
 
   qa-deploy:
     if: github.ref == 'refs/heads/SF-QA'
@@ -102,15 +103,16 @@ jobs:
           name: delta-backup-SF-QA
           path: deltabackup*
 
-      - name: Deploy Delta to Org
+      - name: 🚀 Deploy Delta to Org
         run: |
-          sfdx force:source:deploy \
-            --sourcepath delta/package \
+          sf project deploy start \
+            --source-dir delta/package \
             --ignore-conflicts \
-            -u ${{ env.ORG_ALIAS }} \
-            -c \
+            --target-org ${{ env.ORG_ALIAS }} \
+            --test-level RunSpecifiedTests \
+            --tests "AttachmentTriggerHandler_Test" \
             --wait 10 \
-            --verbose
+            --verbose || { echo "❌ Deployment failed."; exit 1; }
 
       - name: Update SHA in Target Salesforce Org After Deployment
         if: success()
@@ -149,6 +151,8 @@ jobs:
             sf project deploy start \
               --manifest delta/destructive/package.xml \
               --destructive-changes delta/destructive/destructiveChanges.xml \
+              --test-level RunSpecifiedTests \
+              --tests "AttachmentTriggerHandler_Test" \
               --target-org ${{ env.ORG_ALIAS }} \
               --wait 10 \
               --verbose || echo "⚠️ Destructive deployment skipped due to error."
@@ -227,11 +231,22 @@ jobs:
         run: |
           COMMIT_SHA=$(git rev-parse HEAD)
           echo "📝 Delta deployment successful. Updating SHA to ${COMMIT_SHA} in Org..."
-          sf data record update \
-            --sobject Deployment_Metadata__mdt \
-            --record-id "$(sf data query --query "SELECT Id FROM Deployment_Metadata__mdt LIMIT 1" --target-org "${{ env.ORG_ALIAS }}" --json | jq -r '.result.records[0].Id')" \
-            --values "Last_Deployed_SHA__c='${COMMIT_SHA}'" \
-            --target-org "${{ env.ORG_ALIAS }}" \
+
+          CMDT_RECORD_ID=$(sfdx force:data:soql:query \
+            -q "SELECT Id FROM Deployment_Metadata__mdt LIMIT 1" \
+            -u "${ORG_ALIAS}" \
+            --json | jq -r '.result.records[0].Id')
+
+          if [[ -z "$CMDT_RECORD_ID" || "$CMDT_RECORD_ID" == "null" ]]; then
+            echo "⚠️ Could not retrieve CMDT record ID. Skipping SHA update."
+            exit 0
+          fi
+
+          sfdx force:data:record:update \
+            -s Deployment_Metadata__mdt \
+            -i "$CMDT_RECORD_ID" \
+            -u "${ORG_ALIAS}" \
+            -v "Last_Deployed_SHA__c='${COMMIT_SHA}'" \
             --usetoolingapi \
             --verbose
 
