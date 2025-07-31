@@ -2,22 +2,15 @@
 set -e
 set -o pipefail
 
-# === PATH AWARENESS ===
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"  # assumes script is in CICD/CIScripts
-
-# === MOVE TO REPO ROOT ===
-cd "$PROJECT_ROOT"
-
 # === CONFIGURATION ===
 API_VERSION="${API_VERSION:-63.0}"
-DELTA_DIR="$PROJECT_ROOT/delta"
+DELTA_DIR="delta"
 PACKAGE_DIR="$DELTA_DIR/package"
 PACKAGE_XML="$PACKAGE_DIR/package.xml"
 DESTRUCTIVE_XML="$DELTA_DIR/destructiveChanges.xml"
-INPUT_FILE="$PROJECT_ROOT/changed-files.txt"
-DELETIONS_FILE="$PROJECT_ROOT/deleted-files.txt"
-ENVIRONMENT="${ENVIRONMENT:-SF-QA}"
+INPUT_FILE="changed-files.txt"
+DELETIONS_FILE="deleted-files.txt"
+ENVIRONMENT="${environment:-SF-QA}"  # Injected from GitHub workflow env
 FALLBACK_DEPTH="${FALLBACK_DEPTH:-3}"
 ORG_ALIAS="${ORG_ALIAS:-MyTargetOrg}"
 
@@ -26,15 +19,18 @@ case "$ENVIRONMENT" in
   SF-QA) BASE_BRANCH="origin/SF-QA"; ENV_ICON="🔬" ;;
   SF-UAT) BASE_BRANCH="origin/SF-UAT"; ENV_ICON="🧪" ;;
   SF-Release) BASE_BRANCH="origin/SF-Release"; ENV_ICON="🚦" ;;
-  *) BASE_BRANCH=""; ENV_ICON="🧩" ;;
+  *) BASE_BRANCH=""; ENV_ICON="🧩" ;; # Feature validation context
 esac
 
 echo "🌍 Environment: $ENVIRONMENT"
 [[ -n "$BASE_BRANCH" ]] && echo "🔗 Base Branch: $BASE_BRANCH"
 
+export GIT_DIR="$(pwd)/.git"
+export GIT_WORK_TREE="$(pwd)"
+
 # === SAFETY CHECK ===
-if ! git rev-parse --show-toplevel > /dev/null 2>&1; then
-  echo "❌ Git repository not found in $(pwd). Aborting."
+if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+  echo "❌ Not inside a Git repository. Aborting."
   exit 1
 fi
 
@@ -93,8 +89,9 @@ while read -r status file; do
     continue
   fi
   [[ ! -f "$file" ]] && continue
-  mkdir -p "$(dirname "$PACKAGE_DIR/$file")"
-  cp "$file" "$PACKAGE_DIR/$file"
+  dest="$PACKAGE_DIR/$file"
+  mkdir -p "$(dirname "$dest")"
+  cp "$file" "$dest"
 done < "$INPUT_FILE"
 
 # === STEP 5: Generate package.xml ===
@@ -102,9 +99,9 @@ echo "📦 Generating package.xml..."
 sf project manifest generate \
   --source-dir "$PACKAGE_DIR" \
   --api-version "$API_VERSION"
-mv package.xml "$PACKAGE_XML"
+mv ./package.xml "$PACKAGE_XML"
 
-# === STEP 6: Build destructiveChanges.xml ===
+# === STEP 6: Build destructiveChanges.xml (for deploy jobs only) ===
 if [[ "$USE_LAST_SHA" == "true" ]]; then
   echo "🗑️ Building destructiveChanges.xml..."
   echo '<?xml version="1.0" encoding="UTF-8"?>' > "$DESTRUCTIVE_XML"
@@ -131,7 +128,7 @@ fi
 echo "📜 Delta package contents:"
 find "$PACKAGE_DIR" -type f ! -name "package.xml" | sed "s|^$PACKAGE_DIR/|- |"
 
-# === STEP 8: Write summary ===
+# === STEP 8: Write summary if supported ===
 if [[ -n "$GITHUB_STEP_SUMMARY" ]]; then
   echo "📝 Writing summary to GitHub step summary..."
   {

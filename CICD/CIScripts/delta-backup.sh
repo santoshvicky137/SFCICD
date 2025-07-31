@@ -9,10 +9,10 @@ PACKAGE_XML="$PROJECT_ROOT/delta/package/package.xml"
 BACKUP_DIR="${BACKUP_DIR:-$PROJECT_ROOT/deltabackup-$(date +%Y%m%d-%H%M%S)}"
 ORG_ALIAS="${ORG_ALIAS:-target-org}"
 
-echo "📁 Script path: $SCRIPT_DIR"
+echo "📁 Script location: $SCRIPT_DIR"
 echo "📁 Project root: $PROJECT_ROOT"
-echo "📄 Manifest path: $PACKAGE_XML"
 echo "📂 Backup destination: $BACKUP_DIR"
+echo "📄 Manifest path: $PACKAGE_XML"
 
 # === VALIDATION ===
 if [[ ! -f "$PROJECT_ROOT/sfdx-project.json" ]]; then
@@ -43,7 +43,7 @@ if [[ -z "$(find "$BACKUP_DIR" -type f -name '*.xml' 2>/dev/null)" ]]; then
   echo "⚠️ No metadata files retrieved. Likely new components not present in org."
   echo "🧩 Continuing pipeline without backup."
 else
-  echo "✅ Backup completed at '$BACKUP_DIR'."
+  echo "✅ Backup completed to '$BACKUP_DIR'."
 fi
 
 # === GITHUB STEP SUMMARY ===
