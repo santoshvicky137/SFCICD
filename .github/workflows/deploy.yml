@@ -119,6 +119,7 @@ jobs:
 
       - name: Update SHA in Target Salesforce Org After Deployment
         if: success()
+        shell: bash
         run: |
           COMMIT_SHA=$(git rev-parse HEAD)
           echo "📝 Delta deployment successful. Updating SHA to ${COMMIT_SHA} in Org..."
@@ -127,18 +128,19 @@ jobs:
             -q "SELECT Id FROM Deployment_Metadata__mdt LIMIT 1" \
             -u "${ORG_ALIAS}" \
             --json | jq -r '.result.records[0].Id')
+            echo "$CMDT_RECORD_ID"
 
           if [[ -z "$CMDT_RECORD_ID" || "$CMDT_RECORD_ID" == "null" ]]; then
             echo "⚠️ Could not retrieve CMDT record ID. Skipping SHA update."
             exit 0
           fi
 
-          sfdx force:data:record:update \
-            -s Deployment_Metadata__mdt \
+          sf force data record update  \
+            -s "Deployment_Metadata__mdt" \
             -i "$CMDT_RECORD_ID" \
-            -u "${ORG_ALIAS}" \
+            -o "${ORG_ALIAS}" \
             -v "Last_Deployed_SHA__c='${COMMIT_SHA}'" \
-            --usetoolingapi 
+            -t 
 
       - name: Deploy Destructive Changes
         run: |
