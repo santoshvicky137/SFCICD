@@ -4,7 +4,7 @@ set -o pipefail
 
 # === PATH AWARENESS ===
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PACKAGE_XML="$PROJECT_ROOT/delta/package/package.xml"
 BACKUP_DIR="${BACKUP_DIR:-$PROJECT_ROOT/deltabackup-$(date +%Y%m%d-%H%M%S)}"
 ORG_ALIAS="${ORG_ALIAS:-target-org}"

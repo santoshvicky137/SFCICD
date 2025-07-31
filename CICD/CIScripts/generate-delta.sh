@@ -40,8 +40,9 @@ BASE_COMMIT=""
 
 if [[ "$ENVIRONMENT" =~ SF-QA|SF-UAT|SF-Release ]]; then
   echo "🔍 Retrieving last deploy SHA from org..."
-  CMDT_QUERY_RESULT=$(sf data query "SELECT Last_Deployed_SHA__c  FROM Deployment_Metadata__mdt" \
-    --target-org "$ORG_ALIAS" --json || true)
+  CMDT_QUERY_RESULT=$(sfdx force:data:soql:query \
+    -q "SELECT Last_Deployed_SHA__c FROM Deployment_Metadata__mdt" \
+    -u "$ORG_ALIAS" --json || true)
 
   DEPLOYED_SHA=$(echo "$CMDT_QUERY_RESULT" | jq -r '.result.records[0].Last_Deployed_SHA__c')
 
@@ -65,7 +66,7 @@ fi
 
 RANGE="${BASE_COMMIT}..HEAD"
 echo "📊 Diff range: $RANGE"
-git diff --name-status $RANGE -- 'force-app/**' > "$INPUT_FILE"
+git diff --name-status $RANGE -- 'CICD/force-app/**' > "$INPUT_FILE"
 
 echo "📋 Changed files:"
 cat "$INPUT_FILE" || echo "None"
@@ -107,7 +108,7 @@ if [[ "$USE_LAST_SHA" == "true" ]]; then
   echo '<?xml version="1.0" encoding="UTF-8"?>' > "$DESTRUCTIVE_XML"
   echo '<Package xmlns="http://soap.sforce.com/2006/04/metadata">' >> "$DESTRUCTIVE_XML"
 
-  cut -d '/' -f2- <<< "$(grep . "$DELETIONS_FILE")" \
+  cut -d '/' -f3- <<< "$(grep . "$DELETIONS_FILE")" \
     | sed 's/\.[^.]*$//' \
     | awk -F '/' '{print $1, $2}' \
     | sort | uniq \
