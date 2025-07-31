@@ -66,7 +66,7 @@ fi
 
 RANGE="${BASE_COMMIT}..HEAD"
 echo "📊 Diff range: $RANGE"
-git diff --name-status $RANGE -- 'CICD/force-app/**' > "$INPUT_FILE"
+git diff --name-status $RANGE -- 'force-app/**' > "$INPUT_FILE"
 
 echo "📋 Changed files:"
 cat "$INPUT_FILE" || echo "None"
