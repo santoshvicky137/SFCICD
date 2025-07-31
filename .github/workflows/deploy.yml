@@ -50,7 +50,7 @@ jobs:
           fetch-depth: 0
 
       - name: Make Scripts Executable
-        run: chmod +x CIScripts/*.sh
+        run: chmod +x CICD/CIScripts/*.sh
 
       - name: Authenticate to Salesforce Org (QA)
         run: |
@@ -58,7 +58,7 @@ jobs:
           sf org login sfdx-url --sfdx-url-file auth-url.txt --alias ${{ env.ORG_ALIAS }} --set-default
 
       - name: Generate Delta Package
-        run: bash CIScripts/generate-delta.sh
+        run: bash CICD/CIScripts/generate-delta.sh
 
       - name: Validate Deployment
         run: |
@@ -81,7 +81,7 @@ jobs:
           fetch-depth: 0
 
       - name: Make Scripts Executable
-        run: chmod +x CIScripts/*.sh
+        run: chmod +x CICD/CIScripts/*.sh
 
       - name: Authenticate to Salesforce Org (QA)
         run: |
@@ -89,10 +89,10 @@ jobs:
           sf org login sfdx-url --sfdx-url-file auth-url.txt --alias ${{ env.ORG_ALIAS }} --set-default
 
       - name: Generate Delta Package
-        run: bash CIScripts/generate-delta.sh
+        run: bash CICD/CIScripts/generate-delta.sh
 
       - name: Backup Delta from Org
-        run: bash CIScripts/delta-backup.sh
+        run: bash CICD/CIScripts/delta-backup.sh
         env:
           BACKUP_DIR: "deltabackup-${{ github.run_id }}"
           ORG_ALIAS: ${{ env.ORG_ALIAS }}
@@ -101,7 +101,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: delta-backup-SF-QA
-          path: deltabackup*
+          path: CICD/deltabackup*
 
       - name: Deploy Delta to Org
         run: |
@@ -161,7 +161,7 @@ jobs:
           fetch-depth: 0
 
       - name: Make Scripts Executable
-        run: chmod +x CIScripts/*.sh
+        run: chmod +x CICD/CIScripts/*.sh
 
       - name: Authenticate to Salesforce Org
         run: |
@@ -176,13 +176,13 @@ jobs:
           sf org login sfdx-url --sfdx-url-file auth-url.txt --alias ${{ env.ORG_ALIAS }} --set-default
 
       - name: Generate Delta Package
-        run: bash CIScripts/generate-delta.sh
+        run: bash CICD/CIScripts/generate-delta.sh
         env:
           ENVIRONMENT: ${{ github.event.inputs.environment }}
           FALLBACK_DEPTH: ${{ env.FALLBACK_DEPTH }}
 
       - name: Backup Delta from Org
-        run: bash CIScripts/delta-backup.sh
+        run: bash CICD/CIScripts/delta-backup.sh
         env:
           BACKUP_DIR: "deltabackup-${{ github.run_id }}"
           ORG_ALIAS: ${{ env.ORG_ALIAS }}
@@ -191,7 +191,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: delta-backup-${{ github.event.inputs.environment }}
-          path: deltabackup*
+          path: CICD/deltabackup*
 
       - name: Deploy Delta to Org
         run: |
