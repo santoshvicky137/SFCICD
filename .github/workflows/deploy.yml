@@ -69,8 +69,7 @@ jobs:
            --target-org target-org \
            --test-level RunSpecifiedTests \
            --tests "AttachmentTriggerHandler_Test" \
-           --wait 10 \
-           --verbose || { echo "❌ Validation failed."; exit 1; }
+           --wait 10 || { echo "❌ Validation failed."; exit 1; }
 
   qa-deploy:
     if: github.ref == 'refs/heads/SF-QA'
@@ -139,8 +138,7 @@ jobs:
             -i "$CMDT_RECORD_ID" \
             -u "${ORG_ALIAS}" \
             -v "Last_Deployed_SHA__c='${COMMIT_SHA}'" \
-            --usetoolingapi \
-            --verbose
+            --usetoolingapi 
 
       - name: Deploy Destructive Changes
         run: |
@@ -253,8 +251,7 @@ jobs:
             -i "$CMDT_RECORD_ID" \
             -u "${ORG_ALIAS}" \
             -v "Last_Deployed_SHA__c='${COMMIT_SHA}'" \
-            --usetoolingapi \
-            --verbose
+            --usetoolingapi 
 
       - name: Deploy Destructive Changes
         run: |
