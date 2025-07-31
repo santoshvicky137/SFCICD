@@ -3,16 +3,16 @@ name: Salesforce Deploy
 on:
   push:
     branches:
-      - 'feature/*'
-      - 'Feature/*'
-      - 'FEATURE/*'
-      - 'SMGR-*'
-      - 'smgr-*'
-      - 'Smgr-*'
-      - 'SFO/*'
-      - 'sfo/*'
-      - 'Sfo/*'
-      - 'SF-QA'
+    - 'feature/*'
+    - 'Feature/*'
+    - 'FEATURE/*'
+    - 'SMGR-*'
+    - 'smgr-*'
+    - 'Smgr-*'
+    - 'SFO/*'
+    - 'sfo/*'
+    - 'Sfo/*'
+    - 'SF-QA'
   workflow_dispatch:
     inputs:
       environment:
@@ -21,8 +21,8 @@ on:
         default: 'SF-UAT'
         type: choice
         options:
-          - SF-UAT
-          - SF-Release
+        - SF-UAT
+        - SF-Release
 
 env:
   API_VERSION: '63.0'
@@ -44,108 +44,121 @@ jobs:
     runs-on: ubuntu-latest
     container: vlenergy/salesforcevlocity:v4.0
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
-      - name: Make Scripts Executable
-        run: chmod +x CIScripts/*.sh
+    - name: Make Scripts Executable
+      run: chmod +x CICD/CIScripts/*.sh
 
-      - name: Authenticate to Salesforce Org (QA)
-        run: |
-          echo "${{ secrets.SFDX_AUTH_URL_QA }}" > auth-url.txt
-          sf org login sfdx-url --sfdx-url-file auth-url.txt --alias ${{ env.ORG_ALIAS }} --set-default
+    - name: Authenticate to Salesforce Org (QA)
+      run: |
+        echo "${{ secrets.SFDX_AUTH_URL_QA }}" > auth-url.txt
+        sf org login sfdx-url --sfdx-url-file auth-url.txt --alias ${{ env.ORG_ALIAS }} --set-default
 
-      - name: Generate Delta Package
-        run: bash CIScripts/generate-delta.sh
+    - name: Generate Delta Package
+      run: bash CICD/CIScripts/generate-delta.sh
 
-      - name: Validate Deployment
-        run: |
-          sf project deploy validate \
-            --source-dir delta/package \
-            --target-org ${{ env.ORG_ALIAS }} \
-            --test-level RunSpecifiedTests \
-            --tests "AttachmentTriggerHandler_Test" \
-            --wait 10 \
-            --verbose || { echo "❌ Validation failed."; exit 1; }
+    - name: Validate Deployment
+      working-directory: ${{ github.workspace }}
+      run: |
+        sf project deploy validate \
+          --source-dir delta/package \
+          --target-org ${{ env.ORG_ALIAS }} \
+          --test-level RunSpecifiedTests \
+          --tests "AttachmentTriggerHandler_Test" \
+          --wait 10 \
+          --verbose || { echo "❌ Validation failed."; exit 1; }
 
   qa-deploy:
     if: github.ref == 'refs/heads/SF-QA'
     runs-on: ubuntu-latest
     container: vlenergy/salesforcevlocity:v4.0
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
-      - name: Make Scripts Executable
-        run: chmod +x CIScripts/*.sh
+    - name: Make Scripts Executable
+      run: chmod +x CICD/CIScripts/*.sh
 
-      - name: Authenticate to Salesforce Org (QA)
-        run: |
-          echo "${{ secrets.SFDX_AUTH_URL_QA }}" > auth-url.txt
-          sf org login sfdx-url --sfdx-url-file auth-url.txt --alias ${{ env.ORG_ALIAS }} --set-default
+    - name: Authenticate to Salesforce Org (QA)
+      run: |
+        echo "${{ secrets.SFDX_AUTH_URL_QA }}" > auth-url.txt
+        sf org login sfdx-url --sfdx-url-file auth-url.txt --alias ${{ env.ORG_ALIAS }} --set-default
 
-      - name: Generate Delta Package
-        run: bash CIScripts/generate-delta.sh
+    - name: Generate Delta Package
+      run: bash CICD/CIScripts/generate-delta.sh
 
-      - name: Backup Delta from Org
-        run: bash CIScripts/delta-backup.sh
-        env:
-          BACKUP_DIR: "deltabackup-${{ github.run_id }}"
-          ORG_ALIAS: ${{ env.ORG_ALIAS }}
+    - name: Backup Delta from Org
+      run: bash CICD/CIScripts/delta-backup.sh
+      env:
+        BACKUP_DIR: "deltabackup-${{ github.run_id }}"
+        ORG_ALIAS: ${{ env.ORG_ALIAS }}
 
-      - name: Upload Delta Backup Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: delta-backup-SF-QA
-          path: deltabackup*
+    - name: Upload Delta Backup Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: delta-backup-SF-QA
+        path: CICD/deltabackup*
 
-      - name: Deploy Delta to Org
-        run: |
+    - name: Deploy Delta to Org
+      working-directory: ${{ github.workspace }}
+      id: deploy_delta
+      run: |
+        sf project deploy start \
+          --source-dir delta/package \
+          --ignore-conflicts \
+          --target-org ${{ env.ORG_ALIAS }} \
+          --test-level RunSpecifiedTests \
+          --tests "AttachmentTriggerHandler_Test" \
+          --wait 10 \
+          --verbose
+
+    - name: Update SHA in Target Salesforce Org After Deployment
+      if: success()
+      run: |
+        COMMIT_SHA=$(git rev-parse HEAD)
+        echo "📝 Delta deployment successful. Updating SHA to ${COMMIT_SHA} in Org..."
+        sf data record update \
+          --sobject Deployment_Metadata__mdt \
+          --record-id "$(sf data query --query "SELECT Id FROM Deployment_Metadata__mdt LIMIT 1" --target-org "${{ env.ORG_ALIAS }}" --json | jq -r '.result.records[0].Id')" \
+          --values "Last_Deployed_SHA__c='${COMMIT_SHA}'" \
+          --target-org "${{ env.ORG_ALIAS }}" \
+          --usetoolingapi \
+          --verbose
+
+    - name: Deploy Destructive Changes
+      working-directory: ${{ github.workspace }}
+      run: |
+        if [[ -s "delta/destructiveChanges.xml" ]]; then
+          echo "✅ Destructive changes found. Deploying..."
+          mkdir -p delta/destructive
+          echo '<?xml version="1.0" encoding="UTF-8"?>' > delta/destructive/package.xml
+          echo '<Package xmlns="http://soap.sforce.com/2006/04/metadata">' >> delta/destructive/package.xml
+          echo "  <version>${{ env.API_VERSION }}</version>" >> delta/destructive/package.xml
+          echo '</Package>' >> delta/destructive/package.xml
+          cp delta/destructiveChanges.xml delta/destructive/destructiveChanges.xml
           sf project deploy start \
-            --source-dir delta/package \
-            --ignore-conflicts \
-            --target-org ${{ env.ORG_ALIAS }} \
-            --test-level RunSpecifiedTests \
+            --manifest delta/destructive/package.xml \
+            --destructive-changes delta/destructive/destructiveChanges.xml \
             --tests "AttachmentTriggerHandler_Test" \
+            --target-org ${{ env.ORG_ALIAS }} \
             --wait 10 \
-            --verbose || { echo "❌ Deployment failed."; exit 1; }
-
-      - name: Update SHA in Target Salesforce Org After Deployment
-        run: |
-          COMMIT_SHA=$(git rev-parse HEAD)
-          echo "📝 Delta deployment successful. Updating SHA to ${COMMIT_SHA} in Org..."
-          sf data record update \
-            --sobject Deployment_Metadata__mdt \
-            --record-id "$(sf data query --query "SELECT Id FROM Deployment_Metadata__mdt LIMIT 1" --target-org "${{ env.ORG_ALIAS }}" --json | jq -r '.result.records[0].Id')" \
-            --values "Last_Deployed_SHA__c='${COMMIT_SHA}'" \
-            --target-org "${{ env.ORG_ALIAS }}" \
-            --usetoolingapi \
-            --verbose|| echo "⚠️ Failed to update SHA in Org."
-
-      - name: Deploy Destructive Changes
-        run: |
-          if [[ -s "delta/destructiveChanges.xml" ]]; then
-            echo "✅ Destructive changes found. Deploying..."
-            mkdir -p delta/destructive
-            echo '<?xml version="1.0" encoding="UTF-8"?>' > delta/destructive/package.xml
-            echo '<Package xmlns="http://soap.sforce.com/2006/04/metadata">' >> delta/destructive/package.xml
-            echo "  <version>${{ env.API_VERSION }}</version>" >> delta/destructive/package.xml
-            echo '</Package>' >> delta/destructive/package.xml
-            cp delta/destructiveChanges.xml delta/destructive/destructiveChanges.xml
-            sf project deploy start \
-              --manifest delta/destructive/package.xml \
-              --destructive-changes delta/destructive/destructiveChanges.xml \
-              --tests "AttachmentTriggerHandler_Test" \
-              --target-org ${{ env.ORG_ALIAS }} \
-              --wait 10 \
-              --verbose || echo "⚠️ Destructive deployment skipped due to error."
-          else
-            echo "🚫 No destructive changes found. Skipping."
-          fi
+            --verbose || echo "⚠️ Destructive deployment skipped due to error."
+        else
+          echo "🚫 No destructive changes found. Skipping."
+        fi
+    - name: Cleanup Temporary Files
+      if: always() # Run this even if previous steps fail
+      run: |
+        echo "🧹 Cleaning up temporary files..."
+        rm -f auth-url.txt
+        rm -rf delta/
+        rm -rf CICD/deltabackup*
+        echo "✅ Cleanup complete."
 
   manual-deploy:
     if: github.event_name == 'workflow_dispatch'
@@ -155,85 +168,95 @@ jobs:
       ENVIRONMENT: ${{ github.event.inputs.environment }}
       ORG_ALIAS: 'target-org'
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
-      - name: Make Scripts Executable
-        run: chmod +x CIScripts/*.sh
+    - name: Make Scripts Executable
+      run: chmod +x CICD/CIScripts/*.sh
 
-      - name: Authenticate to Salesforce Org
-        run: |
-          if [[ "${{ github.event.inputs.environment }}" == "SF-UAT" ]]; then
-            echo "${{ secrets.SFDX_AUTH_URL_UAT }}" > auth-url.txt
-          elif [[ "${{ github.event.inputs.environment }}" == "SF-Release" ]]; then
-            echo "${{ secrets.SFDX_AUTH_URL_PREPROD }}" > auth-url.txt
-          else
-            echo "❌ Unknown environment. Aborting."
-            exit 1
-          fi
-          sf org login sfdx-url --sfdx-url-file auth-url.txt --alias ${{ env.ORG_ALIAS }} --set-default
+    - name: Authenticate to Salesforce Org
+      run: |
+        if [[ "${{ github.event.inputs.environment }}" == "SF-UAT" ]]; then
+          echo "${{ secrets.SFDX_AUTH_URL_UAT }}" > auth-url.txt
+        elif [[ "${{ github.event.inputs.environment }}" == "SF-Release" ]]; then
+          echo "${{ secrets.SFDX_AUTH_URL_PREPROD }}" > auth-url.txt
+        else
+          echo "❌ Unknown environment. Aborting."
+          exit 1
+        fi
+        sf org login sfdx-url --sfdx-url-file auth-url.txt --alias ${{ env.ORG_ALIAS }} --set-default
 
-      - name: Generate Delta Package
-        run: bash CIScripts/generate-delta.sh
-        env:
-          ENVIRONMENT: ${{ github.event.inputs.environment }}
-          FALLBACK_DEPTH: ${{ env.FALLBACK_DEPTH }}
+    - name: Generate Delta Package
+      run: bash CICD/CIScripts/generate-delta.sh
+      env:
+        ENVIRONMENT: ${{ github.event.inputs.environment }}
+        FALLBACK_DEPTH: ${{ env.FALLBACK_DEPTH }}
 
-      - name: Backup Delta from Org
-        run: bash CIScripts/delta-backup.sh
-        env:
-          BACKUP_DIR: "deltabackup-${{ github.run_id }}"
-          ORG_ALIAS: ${{ env.ORG_ALIAS }}
+    - name: Backup Delta from Org
+      run: bash CICD/CIScripts/delta-backup.sh
+      env:
+        BACKUP_DIR: "deltabackup-${{ github.run_id }}"
+        ORG_ALIAS: ${{ env.ORG_ALIAS }}
 
-      - name: Upload Delta Backup Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: delta-backup-${{ github.event.inputs.environment }}
-          path: deltabackup*
+    - name: Upload Delta Backup Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: delta-backup-${{ github.event.inputs.environment }}
+        path: CICD/deltabackup*
 
-      - name: Deploy Delta to Org
-        run: |
+    - name: Deploy Delta to Org
+      working-directory: ${{ github.workspace }}
+      id: deploy_delta
+      run: |
+        sf project deploy start \
+          --source-dir delta/package \
+          --ignore-conflicts \
+          --target-org ${{ env.ORG_ALIAS }} \
+          --test-level RunSpecifiedTests \
+          --tests "AttachmentTriggerHandler_Test" \
+          --wait 10 \
+          --verbose
+
+    - name: Update SHA in Target Salesforce Org After Deployment
+      if: success()
+      run: |
+        COMMIT_SHA=$(git rev-parse HEAD)
+        echo "📝 Delta deployment successful. Updating SHA to ${COMMIT_SHA} in Org..."
+        sf data record update \
+          --sobject Deployment_Metadata__mdt \
+          --record-id "$(sf data query --query "SELECT Id FROM Deployment_Metadata__mdt LIMIT 1" --target-org "${{ env.ORG_ALIAS }}" --json | jq -r '.result.records[0].Id')" \
+          --values "Last_Deployed_SHA__c='${COMMIT_SHA}'" \
+          --target-org "${{ env.ORG_ALIAS }}" \
+          --usetoolingapi \
+          --verbose
+
+    - name: Deploy Destructive Changes
+      working-directory: ${{ github.workspace }}
+      run: |
+        if [[ -s "delta/destructiveChanges.xml" ]]; then
+          echo "✅ Destructive changes found. Deploying..."
+          mkdir -p delta/destructive
+          echo '<?xml version="1.0" encoding="UTF-8"?>' > delta/destructive/package.xml
+          echo '<Package xmlns="http://soap.sforce.com/2006/04/metadata">' >> delta/destructive/package.xml
+          echo "  <version>${{ env.API_VERSION }}</version>" >> delta/destructive/package.xml
+          echo '</Package>' >> delta/destructive/package.xml
+          cp delta/destructiveChanges.xml delta/destructive/destructiveChanges.xml
           sf project deploy start \
-            --source-dir delta/package \
-            --ignore-conflicts \
+            --manifest delta/destructive/package.xml \
+            --destructive-changes delta/destructive/destructiveChanges.xml \
             --target-org ${{ env.ORG_ALIAS }} \
-            --test-level RunSpecifiedTests \
-            --tests "AttachmentTriggerHandler_Test" \
             --wait 10 \
-            --verbose || { echo "❌ Deployment failed."; exit 1; }
-
-      - name: Update SHA in Target Salesforce Org After Deployment
-        run: |
-          COMMIT_SHA=$(git rev-parse HEAD)
-          echo "📝 Delta deployment successful. Updating SHA to ${COMMIT_SHA} in Org..."
-          sf data record update \
-            --sobject Deployment_Metadata__mdt \
-            --record-id "$(sf data query --query "SELECT Id FROM Deployment_Metadata__mdt LIMIT 1" --target-org "${{ env.ORG_ALIAS }}" --json | jq -r '.result.records[0].Id')" \
-            --values "Last_Deployed_SHA__c='${COMMIT_SHA}'" \
-            --target-org "${{ env.ORG_ALIAS }}" \
-            --usetoolingapi \
-            --verbose|| echo "⚠️ Failed to update SHA in Org."
-
-      - name: Deploy Destructive Changes
-        run: |
-          if [[ -s "delta/destructiveChanges.xml" ]]; then
-            echo "✅ Destructive changes found. Deploying..."
-            mkdir -p delta/destructive
-            echo '<?xml version="1.0" encoding="UTF-8"?>' > delta/destructive/package.xml
-            echo '<Package xmlns="http://soap.sforce.com/2006/04/metadata">' >> delta/destructive/package.xml
-            echo "  <version>${{ env.API_VERSION }}</version>" >> delta/destructive/package.xml
-            echo '</Package>' >> delta/destructive/package.xml
-            cp delta/destructiveChanges.xml delta/destructive/destructiveChanges.xml
-            sf project deploy start \
-              --manifest delta/destructive/package.xml \
-              --destructive-changes delta/destructive/destructiveChanges.xml \
-              --target-org ${{ env.ORG_ALIAS }} \
-              --wait 10 \
-              --verbose || {
-                echo "⚠️ Destructive deployment failed. Skipping cleanup."
-              }
-          else
-            echo "🚫 No destructive changes found. Skipping destructive deployment."
-          fi
+            --verbose || echo "⚠️ Destructive deployment failed. Skipping cleanup."
+        else
+          echo "🚫 No destructive changes found. Skipping destructive deployment."
+        fi
+    - name: Cleanup Temporary Files
+      if: always() # Run this even if previous steps fail
+      run: |
+        echo "🧹 Cleaning up temporary files..."
+        rm -f auth-url.txt
+        rm -rf delta/
+        rm -rf CICD/deltabackup*
+        echo "✅ Cleanup complete."
