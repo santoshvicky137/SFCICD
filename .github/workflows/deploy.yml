@@ -141,6 +141,7 @@ jobs:
             -o "${ORG_ALIAS}" \
             -v "Last_Deployed_SHA__c='${COMMIT_SHA}'" 
 
+
       - name: Deploy Destructive Changes
         run: |
           if [[ -s "delta/destructiveChanges.xml" ]]; then
@@ -252,7 +253,6 @@ jobs:
             -i "$CMDT_RECORD_ID" \
             -o "${ORG_ALIAS}" \
             -v "Last_Deployed_SHA__c='${COMMIT_SHA}'"
-            
 
       - name: Deploy Destructive Changes
         run: |
