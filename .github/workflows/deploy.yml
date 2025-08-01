@@ -44,6 +44,8 @@ jobs:
     runs-on: ubuntu-latest
     container: vlenergy/salesforcevlocity:v4.0
     steps:
+      - name: Mark workspace safe for Git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -67,14 +69,15 @@ jobs:
            --target-org target-org \
            --test-level RunSpecifiedTests \
            --tests "AttachmentTriggerHandler_Test" \
-           --wait 10 \
-           --verbose || { echo "❌ Validation failed."; exit 1; }
+           --wait 10 || { echo "❌ Validation failed."; exit 1; }
 
   qa-deploy:
     if: github.ref == 'refs/heads/SF-QA'
     runs-on: ubuntu-latest
     container: vlenergy/salesforcevlocity:v4.0
     steps:
+      - name: Mark workspace safe for Git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -116,6 +119,7 @@ jobs:
 
       - name: Update SHA in Target Salesforce Org After Deployment
         if: success()
+        shell: bash
         run: |
           COMMIT_SHA=$(git rev-parse HEAD)
           echo "📝 Delta deployment successful. Updating SHA to ${COMMIT_SHA} in Org..."
@@ -124,19 +128,18 @@ jobs:
             -q "SELECT Id FROM Deployment_Metadata__mdt LIMIT 1" \
             -u "${ORG_ALIAS}" \
             --json | jq -r '.result.records[0].Id')
+            echo "$CMDT_RECORD_ID"
 
           if [[ -z "$CMDT_RECORD_ID" || "$CMDT_RECORD_ID" == "null" ]]; then
             echo "⚠️ Could not retrieve CMDT record ID. Skipping SHA update."
             exit 0
           fi
 
-          sfdx force:data:record:update \
-            -s Deployment_Metadata__mdt \
+          sf force data record update  \
+            -s "FOA_Branch_Merge__c" \
             -i "$CMDT_RECORD_ID" \
-            -u "${ORG_ALIAS}" \
-            -v "Last_Deployed_SHA__c='${COMMIT_SHA}'" \
-            --usetoolingapi \
-            --verbose
+            -o "${ORG_ALIAS}" \
+            -v "Last_Deployed_SHA__c='${COMMIT_SHA}'" 
 
       - name: Deploy Destructive Changes
         run: |
@@ -177,6 +180,8 @@ jobs:
       ENVIRONMENT: ${{ github.event.inputs.environment }}
       ORG_ALIAS: 'target-org'
     steps:
+      - name: Mark workspace safe for Git
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -242,13 +247,12 @@ jobs:
             exit 0
           fi
 
-          sfdx force:data:record:update \
-            -s Deployment_Metadata__mdt \
+          sf force data record update  \
+            -s "FOA_Branch_Merge__c" \
             -i "$CMDT_RECORD_ID" \
-            -u "${ORG_ALIAS}" \
-            -v "Last_Deployed_SHA__c='${COMMIT_SHA}'" \
-            --usetoolingapi \
-            --verbose
+            -o "${ORG_ALIAS}" \
+            -v "Last_Deployed_SHA__c='${COMMIT_SHA}'"
+            
 
       - name: Deploy Destructive Changes
         run: |
