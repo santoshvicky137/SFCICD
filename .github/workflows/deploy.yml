@@ -136,11 +136,11 @@ jobs:
           fi
 
           sf force data record update  \
-            -s "Deployment_Metadata__mdt" \
+            -s "FOA_Branch_Merge__c" \
             -i "$CMDT_RECORD_ID" \
             -o "${ORG_ALIAS}" \
-            -v "Last_Deployed_SHA__c='${COMMIT_SHA}'" \
-            -t 
+            -v "Last_Deployed_SHA__c='${COMMIT_SHA}'" 
+
 
       - name: Deploy Destructive Changes
         run: |
@@ -248,12 +248,11 @@ jobs:
             exit 0
           fi
 
-          sfdx force:data:record:update \
-            -s Deployment_Metadata__mdt \
+          sf force data record update  \
+            -s "FOA_Branch_Merge__c" \
             -i "$CMDT_RECORD_ID" \
-            -u "${ORG_ALIAS}" \
-            -v "Last_Deployed_SHA__c='${COMMIT_SHA}'" \
-            --usetoolingapi 
+            -o "${ORG_ALIAS}" \
+            -v "Last_Deployed_SHA__c='${COMMIT_SHA}'"
 
       - name: Deploy Destructive Changes
         run: |
