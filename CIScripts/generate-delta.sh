@@ -34,7 +34,7 @@ if ! git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
   exit 1
 fi
 
-# === STEP 1: Determine delta range ===
+# === STEP 1: Determine delta range ====
 USE_LAST_SHA=false
 BASE_COMMIT=""
 
