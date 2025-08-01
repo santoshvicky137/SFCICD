@@ -125,7 +125,7 @@ jobs:
           echo "📝 Delta deployment successful. Updating SHA to ${COMMIT_SHA} in Org..."
 
           CMDT_RECORD_ID=$(sfdx force:data:soql:query \
-            -q "SELECT Id FROM Deployment_Metadata__mdt LIMIT 1" \
+            -q "SELECT Id FROM FOA_Branch_Merge__c LIMIT 1" \
             -u "${ORG_ALIAS}" \
             --json | jq -r '.result.records[0].Id')
             echo "$CMDT_RECORD_ID"
@@ -239,7 +239,7 @@ jobs:
           echo "📝 Delta deployment successful. Updating SHA to ${COMMIT_SHA} in Org..."
 
           CMDT_RECORD_ID=$(sfdx force:data:soql:query \
-            -q "SELECT Id FROM Deployment_Metadata__mdt LIMIT 1" \
+            -q "SELECT Id FROM FOA_Branch_Merge__c LIMIT 1" \
             -u "${ORG_ALIAS}" \
             --json | jq -r '.result.records[0].Id')
 
