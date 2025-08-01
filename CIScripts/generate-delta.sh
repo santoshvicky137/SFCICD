@@ -41,7 +41,7 @@ BASE_COMMIT=""
 if [[ "$ENVIRONMENT" =~ SF-QA|SF-UAT|SF-Release ]]; then
   echo "🔍 Retrieving last deploy SHA from org..."
   CMDT_QUERY_RESULT=$(sfdx force:data:soql:query \
-    -q "SELECT Last_Deployed_SHA__c FROM Deployment_Metadata__mdt" \
+    -q "SELECT Last_Deployed_SHA__c FROM FOA_Branch_Merge__c" \
     -u "$ORG_ALIAS" --json || true)
 
   DEPLOYED_SHA=$(echo "$CMDT_QUERY_RESULT" | jq -r '.result.records[0].Last_Deployed_SHA__c')
